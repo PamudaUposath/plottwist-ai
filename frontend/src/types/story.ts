@@ -34,7 +34,7 @@ export type StoryState = {
   flags: Record<string, boolean>;
 };
 
-export type ViewStage = 'landing' | 'setup' | 'story' | 'fullStory';
+export type ViewStage = 'landing' | 'setup' | 'story' | 'fullStory' | 'autopilot' | 'autopilotStory';
 
 export type GenreOption = {
   id: string;

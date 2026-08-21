@@ -62,7 +62,24 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {viewStage !== 'landing' && (
+          <button
+            onClick={() => onGoToLanding()}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewStage === 'landing' ? 'bg-purple-950/40 text-purple-400 border border-purple-500/20' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Create Story
+          </button>
+          <button
+            id="nav-autopilot-btn"
+            onClick={() => {
+              // Custom navigation handler will be plugged into App.tsx
+              (window as any).__onNavigateAutopilot?.();
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${viewStage === 'autopilot' || viewStage === 'autopilotStory' ? 'bg-purple-950/40 text-purple-400 border border-purple-500/20' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Autopilot
+          </button>
+
+          {viewStage !== 'landing' && viewStage !== 'autopilot' && viewStage !== 'autopilotStory' && (
             <button
               onClick={onRequestNewStory}
               className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 px-3 py-1.5 text-xs font-medium text-white shadow-md hover:from-purple-500 hover:to-purple-600 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-purple-400"

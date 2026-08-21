@@ -1,0 +1,10 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "plottwist-autopilot-challenge"
+resolve_s3 = true
+s3_prefix = "plottwist-autopilot"
+region = "us-east-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Environment=\"challenge\" BedrockModelId=\"us.amazon.nova-lite-v1:0\" AgentTimezone=\"Asia/Colombo\" StorySchedule=\"rate(3 hours)\" AllowedOrigin=\"http://localhost:5173\""
+image_repositories = []

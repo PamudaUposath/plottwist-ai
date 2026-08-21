@@ -1,0 +1,217 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: PlotTwist Autopilot - Autonomous AI-Powered Storytelling Backend (AWS SAM)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: challenge
+    AllowedValues:
+      - challenge
+      - dev
+      - prod
+    Description: Environment stage name
+
+  BedrockModelId:
+    Type: String
+    Default: us.amazon.nova-lite-v1:0
+    Description: Amazon Bedrock Model ID for storytelling
+
+  AllowedOrigin:
+    Type: String
+    Default: 'http://localhost:5173'
+    Description: Allowed CORS Origin for HTTP API Gateway
+
+  AgentTimezone:
+    Type: String
+    Default: 'Asia/Colombo'
+    Description: Timezone for creative period selection
+
+  StorySchedule:
+    Type: String
+    Default: 'rate(3 hours)'
+    Description: EventBridge Scheduler interval schedule
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        STORIES_TABLE: !Ref PlotTwistAutopilotStoriesDbTable
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        AGENT_TIMEZONE: !Ref AgentTimezone
+        STORY_SCHEDULE: !Ref StorySchedule
+
+Resources:
+
+
+  PlotTwistAutopilotStoriesDbTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub plottwist-autopilot-stories-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: storyId
+          AttributeType: S
+        - AttributeName: generationType
+          AttributeType: S
+        - AttributeName: generatedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: storyId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: generationType
+              KeyType: HASH
+            - AttributeName: generatedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+
+  # HTTP API Gateway
+  PlotTwistAutopilotHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - !Ref AllowedOrigin
+        AllowMethods:
+          - GET
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Api-Key
+
+  # Generator Lambda Function
+  PlotTwistAutopilotGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub plottwist-autopilot-generator-${Environment}
+      CodeUri: ../agent/
+      Handler: dist/handlers/generateStory.handler
+      Description: Scheduled autonomous generator for stories
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - 'arn:aws:bedrock:*::foundation-model/*'
+                - 'arn:aws:bedrock:*:*:inference-profile/*'
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt PlotTwistAutopilotStoriesDbTable.Arn
+
+  # API Lambda Function
+  PlotTwistAutopilotApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub plottwist-autopilot-api-${Environment}
+      CodeUri: ../agent/
+      Handler: dist/handlers/api.handler
+      Description: Public API backend router for Autopilot
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: !GetAtt PlotTwistAutopilotStoriesDbTable.Arn
+            - Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !Sub "${PlotTwistAutopilotStoriesDbTable.Arn}/index/GSI1"
+      Events:
+        HealthRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PlotTwistAutopilotHttpApi
+            Path: /health
+            Method: get
+        StoriesRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PlotTwistAutopilotHttpApi
+            Path: /stories
+            Method: get
+        LatestRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PlotTwistAutopilotHttpApi
+            Path: /stories/latest
+            Method: get
+        DetailRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PlotTwistAutopilotHttpApi
+            Path: /stories/{id}
+            Method: get
+        StatusRoute:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref PlotTwistAutopilotHttpApi
+            Path: /agent/status
+            Method: get
+
+  # EventBridge Scheduler Execution Role
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeGeneratorLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt PlotTwistAutopilotGeneratorFunction.Arn
+
+  # Scheduler V2 Resource
+  PlotTwistAutopilotScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub plottwist-autopilot-scheduler-${Environment}
+      ScheduleExpression: !Ref StorySchedule
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt PlotTwistAutopilotGeneratorFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+
+Outputs:
+  AutopilotApiUrl:
+    Description: HTTP API Gateway base URL for PlotTwist Autopilot
+    Value: !Sub "https://${PlotTwistAutopilotHttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+  StoriesTableName:
+    Description: DynamoDB stories table name
+    Value: !Ref PlotTwistAutopilotStoriesDbTable
+  GeneratorFunctionName:
+    Description: Generator Lambda Function Name
+    Value: !Ref PlotTwistAutopilotGeneratorFunction
+  ApiFunctionName:
+    Description: API Lambda Function Name
+    Value: !Ref PlotTwistAutopilotApiFunction
+  SchedulerName:
+    Description: EventBridge Scheduler Name
+    Value: !Ref PlotTwistAutopilotScheduler

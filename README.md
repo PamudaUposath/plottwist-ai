@@ -1,25 +1,21 @@
-# PlotTwist
+# PlotTwist Autopilot
 
-**Every Choice Creates a Different Story**
+**PlotTwist Autopilot** is an autonomous creative storytelling agent built for the **AWS Weekend Creative Agent Challenge: Set Your Creative App Free**.
 
-PlotTwist is an interactive branching storytelling application where every decision changes what happens next. Built with React, TypeScript, Vite, and a custom procedural story engine with browser storage persistence, deployed on AWS Amplify Hosting.
+The original PlotTwist lets users shape interactive branching stories. PlotTwist Autopilot goes one step further: **it keeps writing even when nobody is using it.**
 
 ---
 
-## Features
+## Overview
 
-- **Interactive Branching Storytelling**: Generates rich, dynamic story chapters locally using a deterministic procedural story engine.
-- **6 Creative Story Genres**: Fantasy, Science Fiction, Mystery, Adventure, Horror, and Comedy.
-- **Custom Character Creation**: Craft your hero's name and background or let the story engine generate one.
-- **Atmospheric Settings**: Select from curated settings or enter custom realms.
-- **Deterministic Seeded Randomization**: Every story receives a unique seed, ensuring identical replayability when refreshing or re-entering the seed.
-- **Flag-Based Choice System**: User decisions update narrative flags (`controlRoomVisited`, `trustedStranger`, `foundKey`, etc.) that shape future events and endings.
-- **Exactly 3 Choices Per Non-Final Chapter**: Branching decisions (A, B, C) guide plot direction.
-- **Dynamic Endings**: Resolves central narrative arcs tailored to accumulated story flags.
-- **Story Length Options**: Quick Adventure (3 Chapters) or Standard Adventure (5 Chapters).
-- **Digital Storybook UX**: Modern dark-mode interface with smooth page transitions and mobile responsiveness.
-- **Story Export & Sharing**: Copy full story text or share via the Web Share API.
-- **Browser Persistence**: Saves active story state, seed, flags, and completed chapters in local storage.
+PlotTwist Autopilot turns the interactive storytelling application into an always-on autonomous narrative creator. An EventBridge Scheduler wakes up an AWS Lambda function on a configurable schedule, which uses Amazon Bedrock (Amazon Nova) to write a brand new, time-period-sensitive story and save it directly to Amazon DynamoDB. When a user opens the application later, the site displays a notification summarizing what was written "While You Were Away".
+
+---
+
+## What Changed: Interactive vs Autopilot
+
+- **The Original PlotTwist**: Wait for a user to configure settings, make decisions, and advance the story manually chapter-by-chapter.
+- **PlotTwist Autopilot**: Automatically writes complete standalone stories (approximately 500–800 words) using Bedrock 24/7 without any user interaction or browser session active.
 
 ---
 
@@ -27,135 +23,90 @@ PlotTwist is an interactive branching storytelling application where every decis
 
 ```mermaid
 flowchart TD
-    U[User] --> R[React + TypeScript]
-    R --> E[Procedural Story Engine]
-    E --> A[AWS Amplify Hosting]
-```
+    EBS[Amazon EventBridge Scheduler]
+    GEN[AWS Lambda - Autonomous Story Agent]
+    BR[Amazon Bedrock - Amazon Nova]
+    DB[(Amazon DynamoDB)]
+    API[Amazon API Gateway]
+    APIL[AWS Lambda - Story API]
+    UI[React + TypeScript]
+    AMP[AWS Amplify Hosting]
+    CW[Amazon CloudWatch]
 
-```
-User
-  ↓
-React + TypeScript
-  ↓
-Procedural Story Engine
-  ↓
-AWS Amplify Hosting
+    EBS --> GEN
+    GEN --> BR
+    BR --> GEN
+    GEN --> DB
+
+    UI --> API
+    API --> APIL
+    APIL --> DB
+
+    UI --> AMP
+
+    GEN --> CW
+    APIL --> CW
 ```
 
 ---
 
-## Technical Stack
-
-- **Frontend Framework**: React 18, TypeScript, Vite.
-- **Story Engine**: Deterministic Seeded PRNG (Mulberry32), Flag-Based Branching Logic, Modular Content Generators (`frontend/src/storyEngine/`).
-- **Styling**: Tailwind CSS, Lucide React icons.
-- **Testing**: Vitest, React Testing Library.
-- **Deployment**: AWS Amplify Hosting.
-
----
-
-## Project Structure
+## Repository Structure
 
 ```
 plottwist-ai/
-├── frontend/
+│
+├── frontend/                     # Deployed React + TS Frontend
 │   ├── src/
-│   │   ├── storyEngine/
-│   │   │   ├── types.ts       # Story engine interface definitions
-│   │   │   ├── random.ts      # Seeded PRNG (Mulberry32)
-│   │   │   ├── generator.ts   # Core chapter generator orchestration
-│   │   │   ├── genres.ts      # 6 Genre configurations & settings
-│   │   │   ├── openings.ts    # Chapter 1 opening templates
-│   │   │   ├── events.ts      # Mid-chapter event templates
-│   │   │   ├── twists.ts      # Plot twist intensity templates
-│   │   │   ├── endings.ts     # Flag-dependent ending templates
-│   │   │   └── branches.ts    # Branching & choice flag helper functions
-│   │   ├── components/        # React UI components
-│   │   ├── hooks/             # Custom React hooks (useStory)
-│   │   ├── services/          # Story engine API abstraction
-│   │   ├── types/             # Frontend data structures
-│   │   └── __tests__/         # Vitest unit & integration test suites
-├── experimental/
-│   └── bedrock-backend/       # Archived Bedrock/Lambda/SAM backend (experimental)
-└── README.md
+│   │   ├── components/autopilot/ # Autopilot dashboard elements
+│   │   ├── pages/                # Autopilot overview & details pages
+│   │   ├── services/             # autopilotApi service
+│   │   ├── utils/                # lastVisit logic helper
+│   │   └── ...
+│
+├── agent/                        # TypeScript Lambda backend
+│   ├── src/
+│   │   ├── handlers/             # Scheduler & API Gateway Lambda entrypoints
+│   │   ├── services/             # Bedrock and DynamoDB interfaces
+│   │   └── utils/                # Timeperiod, parser, and briefs
+│   └── tests/                    # Vitest backend tests
+│
+├── infrastructure/               # AWS SAM Infrastructure
+│   ├── template.yaml             # SAM/CloudFormation templates
+│   └── samconfig.example.toml    # Deployment parameters template
+│
+└── docs/                         # Guides and architectural blueprints
 ```
 
 ---
 
-## Local Development Setup
+## Local Development & Testing
 
-### Prerequisites
+### 1. Backend Agent
 
-- Node.js v20+ and npm v10+
+```bash
+cd agent
+npm install
+npm run test
+npm run build
+```
 
-### 1. Install Dependencies
+### 2. Frontend Integration
 
 ```bash
 cd frontend
 npm install
-```
-
-### 2. Run Local Development Server
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:5173` in your browser.
-
-### 3. Run Test Suites
-
-```bash
-npm test
-```
-
-### 4. Build Production Bundle
-
-```bash
+npm run test
 npm run build
 ```
 
 ---
 
-## Automated Test Coverage
+## Deployment
 
-The Vitest test suite (`frontend/src/__tests__/storyEngine.test.ts` & `useStory.test.ts`) verifies:
-1. **Seeded Randomness**: Same seed generates identical story content across runs.
-2. **Seed Variation**: Different seeds generate noticeably different stories.
-3. **Choice Consequences**: Decisions mutate flags and influence subsequent chapters and endings.
-4. **Exactly 3 Choices**: Non-final chapters always provide 3 choices.
-5. **Chapter Progression**: Supports 3-chapter Quick and 5-chapter Standard adventures.
-6. **Final Endings**: Endings reflect accumulated flags and complete without choice cards.
-7. **Persistence**: Saves and restores state, seed, and flags cleanly in browser storage.
+Refer to the complete deployment instructions in [`docs/deployment.md`](file:///c:/Users/Nanotek/Desktop/GitHub/plottwist-ai/docs/deployment.md).
 
 ---
 
-## AWS Amplify Hosting Deployment Steps
+## Challenge Evidence
 
-1. Push your repository to **GitHub**:
-   ```bash
-   git add .
-   git commit -m "Deploy PlotTwist procedural story engine"
-   git push origin main
-   ```
-2. Open the **AWS Management Console** and navigate to **AWS Amplify**.
-3. Click **Host web app** and connect your GitHub repository (`plottwist-ai`).
-4. Select the `main` branch.
-5. Configure build settings:
-   - **App root**: `frontend`
-   - **Build command**: `npm run build`
-   - **Output directory**: `dist`
-6. Click **Save and Deploy**.
-7. AWS Amplify will automatically build and deploy your application to a global CDN endpoint with HTTPS enabled.
-
----
-
-## Footer
-
-"Built with React and deployed on AWS Amplify."
-
----
-
-## Author
-
-**Pamuda U. de A. Goonatilake**
+Refer to the checklist in [`docs/challenge-evidence.md`](file:///c:/Users/Nanotek/Desktop/GitHub/plottwist-ai/docs/challenge-evidence.md) to capture logs and screenshot proof of autonomous generation on AWS.
