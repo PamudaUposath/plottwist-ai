@@ -86,6 +86,7 @@ Resources:
       CorsConfiguration:
         AllowOrigins:
           - !Ref AllowedOrigin
+          - 'https://weekend-creative-challenge.d1zhxstzigrcjt.amplifyapp.com'
         AllowMethods:
           - GET
           - OPTIONS
