@@ -46,6 +46,7 @@ Globals:
         ALLOWED_ORIGIN: !Ref AllowedOrigin
         AGENT_TIMEZONE: !Ref AgentTimezone
         STORY_SCHEDULE: !Ref StorySchedule
+        AWS_STAGE: !Ref Environment
 
 Resources:
 

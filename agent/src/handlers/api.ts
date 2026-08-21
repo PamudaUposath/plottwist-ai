@@ -46,8 +46,20 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   }
 
   try {
+    console.log(`API request received. Method: ${method}, Path: ${path}, rawPath: ${event.rawPath}`);
+    // Check if rawPath is defined (for HTTP API payload version 2.0)
+    let requestPath = event.rawPath || path;
+    
+    // Strip environment stage prefix if present (e.g. /challenge/stories -> /stories)
+    const stagePrefix = `/${process.env.AWS_STAGE || 'challenge'}`;
+    if (requestPath.startsWith(stagePrefix)) {
+      requestPath = requestPath.substring(stagePrefix.length);
+    }
+    if (requestPath.length === 0) {
+      requestPath = '/';
+    }
     // GET /health
-    if (method === 'GET' && path === '/health') {
+    if (method === 'GET' && requestPath === '/health') {
       return formatSuccess({
         status: 'ok',
         service: 'PlotTwist Autopilot',
@@ -55,7 +67,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // GET /stories/latest
-    if (method === 'GET' && path === '/stories/latest') {
+    if (method === 'GET' && requestPath === '/stories/latest') {
       const stories = await listAutonomousStories(1);
       if (stories.length === 0) {
         return formatError(404, 'No stories found');
@@ -64,7 +76,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // GET /stories
-    if (method === 'GET' && path === '/stories') {
+    if (method === 'GET' && requestPath === '/stories') {
       let limit = 10;
       if (event.queryStringParameters?.limit) {
         const parsedLimit = parseInt(event.queryStringParameters.limit, 10);
@@ -77,8 +89,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // GET /stories/{id}
-    if (method === 'GET' && path.startsWith('/stories/')) {
-      const parts = path.split('/');
+    if (method === 'GET' && requestPath.startsWith('/stories/')) {
+      const parts = requestPath.split('/');
       const id = parts[parts.length - 1];
       if (!id || id.trim().length === 0) {
         return formatError(400, 'Invalid story ID');
@@ -91,7 +103,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     // GET /agent/status
-    if (method === 'GET' && path === '/agent/status') {
+    if (method === 'GET' && requestPath === '/agent/status') {
       const latestStories = await listAutonomousStories(1);
       const totalStories = await getTotalStoriesCount();
       const schedule = process.env.STORY_SCHEDULE || 'rate(3 hours)';
@@ -104,7 +116,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       });
     }
 
-    return formatError(404, 'Not found');
+    return formatError(404, `Not found: ${requestPath}`);
   } catch (error: any) {
     console.error('API Error:', error);
     return formatError(500, 'Internal Server Error');

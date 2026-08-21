@@ -47,12 +47,12 @@ export async function listAutonomousStories(limit = 10): Promise<AutonomousStory
   const tableName = process.env.STORIES_TABLE || 'plottwist-autopilot-stories';
   const client = getDdbClient();
 
-  // Query using GSI1: GSI1PK = 'AUTONOMOUS', sorted by GSI1SK (generatedAt) descending
+  // Query using GSI1: generationType = 'AUTONOMOUS', sorted by generatedAt descending
   const response = await client.send(
     new QueryCommand({
       TableName: tableName,
       IndexName: 'GSI1',
-      KeyConditionExpression: 'GSI1PK = :pk',
+      KeyConditionExpression: 'generationType = :pk',
       ExpressionAttributeValues: {
         ':pk': 'AUTONOMOUS',
       },
@@ -73,7 +73,7 @@ export async function getTotalStoriesCount(): Promise<number> {
     new QueryCommand({
       TableName: tableName,
       IndexName: 'GSI1',
-      KeyConditionExpression: 'GSI1PK = :pk',
+      KeyConditionExpression: 'generationType = :pk',
       ExpressionAttributeValues: {
         ':pk': 'AUTONOMOUS',
       },
